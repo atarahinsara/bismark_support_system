@@ -6,8 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
-# Distribution / packaging
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 .Python
+
+# Distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -23,20 +30,13 @@ var/
 .installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-ENV/
-env/
-env.bak/
-venv.bak/
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
 
 # PyInstaller
 *.manifest
 *.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
@@ -44,45 +44,56 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
-.cache
+.cache/
 nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# mypy
+# Static type checkers
 .mypy_cache/
+.pytype/
+.pyre/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
-.pyre/
+# Jupyter Notebook
+.ipynb_checkpoints/
 
-# Pytype static analyzer
-.pytype/
-
-# Caches
-*.cache
-.cache/
-
-# Environments
-.env
-.env.*
-
-# VS Code
+# IDEs and Editors
 .vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
 
 # Logs
 *.log
 
-# Database files
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Python environment & secrets
+.env
+.env.*
+*.env
+*.secret
+
+# SQLite / database files
 *.sqlite3
 *.db
 
-# Other
+# Swap files
 *.swp
 *.swo
+
+# Personal notes or output dumps
+*.bak
+*.tmp
+*.old
+
+# Custom project-specific ignores (optional)
+intents_export.csv
+merged.txt
+all_python_files_combined.txt
