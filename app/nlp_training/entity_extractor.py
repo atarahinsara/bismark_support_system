@@ -16,11 +16,6 @@ cities = [
     "یزد", "قزوین"
 ]
 
-genders = {
-    "مرد": ["آقا", "مرد", "آقای", "جناب آقا", "جناب"],
-    "زن": ["خانم", "زن", "خانوم", "سرکار خانم", "سرکار"]
-}
-
 city_to_province_map = {
     "تهران": "تهران",
     "تبریز": "آذربایجان شرقی",
@@ -61,18 +56,6 @@ def extract_entities_from_text(text):
             last_name = ""
         entities.append({"entity": "first_name", "value": first_name})
         entities.append({"entity": "last_name", "value": last_name})
-
-    # --- استخراج جنسیت ---
-    gender_found = False
-    for gender_key, keywords in genders.items():
-        for keyword in keywords:
-            pattern = rf"\b{re.escape(keyword)}\b"
-            if re.search(pattern, text):
-                entities.append({"entity": "gender", "value": gender_key})
-                gender_found = True
-                break
-        if gender_found:
-            break
 
     # --- استخراج شهر (اولویت بالاتر) ---
     city_found = False
