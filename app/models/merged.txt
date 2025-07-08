@@ -1,0 +1,332 @@
+from app import db
+from sqlalchemy.orm import relationship
+
+class Conversation(db.Model):
+    __tablename__ = 'conversations'
+
+    ConversationID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    SalesRepID = db.Column(db.Integer, db.ForeignKey('salesrepresentatives.SalesRepID'))
+    TechnicianID = db.Column(db.Integer, db.ForeignKey('servicetechnicians.TechnicianID'))
+    StartTime = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    EndTime = db.Column(db.DateTime)
+    IsOpen = db.Column(db.Boolean, default=True)
+
+    Customer = relationship('Customer', back_populates='Conversations')
+    SalesRepresentative = relationship('SalesRepresentative', back_populates='Conversations')
+    Technician = relationship('ServiceTechnician', back_populates='Conversations')
+    Messages = relationship('Message', back_populates='Conversation', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<Conversation {self.ConversationID} - Customer {self.CustomerID}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class Customer(db.Model):
+    __tablename__ = 'customers'
+
+    CustomerID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    FirstName = db.Column(db.String(50), nullable=False)
+    LastName = db.Column(db.String(50), nullable=False)
+    Province = db.Column(db.String(50), nullable=False)
+    City = db.Column(db.String(50), nullable=False)
+    Address = db.Column(db.String(255))
+    RegisterDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    Phones = relationship('CustomerPhone', back_populates='Customer', cascade='all, delete-orphan')
+    Products = relationship('Product', back_populates='Customer', cascade='all, delete-orphan')
+    Conversations = relationship('Conversation', back_populates='Customer', cascade='all, delete-orphan')
+    RepairRequests = relationship('RepairRequest', back_populates='Customer', cascade='all, delete-orphan')
+    TrackingCodes = relationship('TrackingCode', back_populates='Customer', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<Customer {self.CustomerID} - {self.FirstName} {self.LastName}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class CustomerPhone(db.Model):
+    __tablename__ = 'customer_phones'
+
+    PhoneID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    PhoneNumber = db.Column(db.String(20), nullable=False, unique=True)
+    CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    PhoneType = db.Column(db.Enum('Mobile', 'Home', 'Work'), default='Mobile')
+
+    Customer = relationship('Customer', back_populates='Phones')
+
+    def __repr__(self):
+        return f"<CustomerPhone {self.PhoneNumber} ({self.PhoneType})>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class Invoice(db.Model):
+    __tablename__ = 'invoices'
+
+    InvoiceID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    RepairRequestID = db.Column(db.Integer, db.ForeignKey('repairrequests.RepairRequestID'), nullable=False)
+    TechnicianID = db.Column(db.Integer, db.ForeignKey('servicetechnicians.TechnicianID'), nullable=False)
+    PartsCost = db.Column(db.Float, default=0)
+    LaborCost = db.Column(db.Float, default=0)
+    TotalCost = db.Column(db.Float, default=0)
+    InvoiceDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    RepairRequest = relationship('RepairRequest', back_populates='Invoices')
+    Technician = relationship('ServiceTechnician')
+
+    def __repr__(self):
+        return f"<Invoice {self.InvoiceID} - RepairRequest {self.RepairRequestID}>"
+from app import db
+from sqlalchemy.orm import relationship
+from sqlalchemy import Enum
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+
+    MessageID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ConversationID = db.Column(db.Integer, db.ForeignKey('conversations.ConversationID'), nullable=False)
+    SenderType = db.Column(db.Enum('Customer', 'SalesRep', 'Technician', 'System'), nullable=False)
+    SenderID = db.Column(db.Integer)
+    Content = db.Column(db.String(1000), nullable=False)
+    Timestamp = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    Conversation = relationship('Conversation', back_populates='Messages')
+
+    def __repr__(self):
+        return f"<Message {self.MessageID} from {self.SenderType}>"
+from app import db
+
+class NlpIntent(db.Model):
+    __tablename__ = 'nlpintents'
+
+    IntentID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Name = db.Column(db.String(100), unique=True, nullable=False)
+    Description = db.Column(db.Text)
+
+    def __repr__(self):
+        return f"<NlpIntent {self.Name}>"
+from app import db
+
+class PartsInventory(db.Model):
+    __tablename__ = 'partsinventory'
+
+    PartID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    PartName = db.Column(db.String(100), unique=True, nullable=False)
+    QuantityAvailable = db.Column(db.Integer, default=0)
+
+    def __repr__(self):
+        return f"<PartsInventory {self.PartName} - {self.QuantityAvailable}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class PartsRequest(db.Model):
+    __tablename__ = 'partsrequests'
+
+    PartsRequestID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    RepairRequestID = db.Column(db.Integer, db.ForeignKey('repairrequests.RepairRequestID'), nullable=False)
+    PartName = db.Column(db.String(100), nullable=False)
+    Quantity = db.Column(db.Integer, default=1)
+    IsApproved = db.Column(db.Boolean, default=False)
+    RequestDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    ApprovalDate = db.Column(db.DateTime)
+
+    RepairRequest = relationship('RepairRequest', back_populates='PartsRequests')
+
+    def __repr__(self):
+        return f"<PartsRequest {self.PartsRequestID} - Part {self.PartName} Qty {self.Quantity}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class PartsUsed(db.Model):
+    __tablename__ = 'partsused'
+
+    PartsUsedID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    RepairRequestID = db.Column(db.Integer, db.ForeignKey('repairrequests.RepairRequestID'), nullable=False)
+    PartID = db.Column(db.Integer, db.ForeignKey('partsinventory.PartID'), nullable=False)
+    QuantityUsed = db.Column(db.Integer, default=1)
+
+    RepairRequest = relationship('RepairRequest', back_populates='PartsUsed')
+    Part = relationship('PartsInventory')
+
+    def __repr__(self):
+        return f"<PartsUsed {self.PartsUsedID} - PartID {self.PartID} Qty {self.QuantityUsed}>"
+from app import db
+
+class Phone(db.Model):
+    __tablename__ = "phones"
+
+    PhoneID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    PhoneNumber = db.Column(db.String(20), nullable=False, unique=True)
+    OwnerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    OwnerType = db.Column(db.String(20), nullable=False)  # مثلا 'Customer', 'SalesRep', 'Technician'
+
+    def __repr__(self):
+        return f"<Phone {self.PhoneNumber} Owner: {self.OwnerType}({self.OwnerID})>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class Product(db.Model):
+    __tablename__ = 'products'
+
+    ProductID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    ProductCode = db.Column(db.String(50), nullable=False)
+    Brand = db.Column(db.String(50))
+    Model = db.Column(db.String(100))
+    SerialNumber = db.Column(db.String(100))
+    WarrantyCardNumber = db.Column(db.String(100))
+    PurchaseDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    Customer = relationship('Customer', back_populates='Products')
+    TrackingCodes = relationship('TrackingCode', back_populates='Product', cascade='all, delete-orphan')
+    RepairRequests = relationship('RepairRequest', back_populates='Product', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<Product {self.ProductID} - {self.ProductCode}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class RepairRequest(db.Model):
+    __tablename__ = 'repairrequests'
+
+    RepairRequestID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    ProductID = db.Column(db.Integer, db.ForeignKey('products.ProductID'), nullable=False)
+    Description = db.Column(db.String(1000), nullable=False)
+    TrackingID = db.Column(db.Integer, db.ForeignKey('trackingcodes.TrackingID'), nullable=False)
+    TechnicianID = db.Column(db.Integer, db.ForeignKey('servicetechnicians.TechnicianID'))
+    RequestDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    IsCompleted = db.Column(db.Boolean, default=False)
+
+    Customer = relationship('Customer', back_populates='RepairRequests')
+    Product = relationship('Product', back_populates='RepairRequests')
+    TrackingCode = relationship('TrackingCode', back_populates='RepairRequests')
+    Technician = relationship('ServiceTechnician', back_populates='RepairRequests')
+    PartsRequests = relationship('PartsRequest', back_populates='RepairRequest', cascade='all, delete-orphan')
+    PartsUsed = relationship('PartsUsed', back_populates='RepairRequest', cascade='all, delete-orphan')
+    Invoices = relationship('Invoice', back_populates='RepairRequest', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<RepairRequest {self.RepairRequestID} - Customer {self.CustomerID}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class SalesRepresentative(db.Model):
+    __tablename__ = 'salesrepresentatives'
+
+    SalesRepID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    FirstName = db.Column(db.String(50), nullable=False)
+    LastName = db.Column(db.String(50), nullable=False)
+    ShopAddress = db.Column(db.String(255))
+    Province = db.Column(db.String(50))
+    City = db.Column(db.String(50))
+    IsActive = db.Column(db.Boolean, default=True)
+    RegisterDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    Phones = relationship('SalesRepresentativePhone', back_populates='SalesRepresentative', cascade='all, delete-orphan')
+    Conversations = relationship('Conversation', back_populates='SalesRepresentative', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<SalesRepresentative {self.SalesRepID} - {self.FirstName} {self.LastName}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class SalesRepresentativePhone(db.Model):
+    __tablename__ = 'sales_rep_phones'
+
+    PhoneID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    PhoneNumber = db.Column(db.String(20), nullable=False, unique=True)
+    SalesRepID = db.Column(db.Integer, db.ForeignKey('salesrepresentatives.SalesRepID'), nullable=False)
+    PhoneType = db.Column(db.Enum('Mobile', 'Work'), default='Mobile')
+
+    SalesRepresentative = relationship('SalesRepresentative', back_populates='Phones')
+
+    def __repr__(self):
+        return f"<SalesRepresentativePhone {self.PhoneNumber} ({self.PhoneType})>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class ServiceTechnician(db.Model):
+    __tablename__ = 'servicetechnicians'
+
+    TechnicianID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    FirstName = db.Column(db.String(50), nullable=False)
+    LastName = db.Column(db.String(50), nullable=False)
+    ShopAddress = db.Column(db.String(255))
+    Province = db.Column(db.String(50))
+    City = db.Column(db.String(50))
+    IsActive = db.Column(db.Boolean, default=True)
+    RegisterDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    Rank = db.Column(db.Float, default=0)
+
+    Phones = relationship('TechnicianPhone', back_populates='Technician', cascade='all, delete-orphan')
+    RepairRequests = relationship('RepairRequest', back_populates='Technician', cascade='all, delete-orphan')
+    Conversations = relationship('Conversation', back_populates='Technician', cascade='all, delete-orphan')
+    Invoices = relationship('Invoice', back_populates='Technician', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<ServiceTechnician {self.TechnicianID} - {self.FirstName} {self.LastName}>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class TechnicianPhone(db.Model):
+    __tablename__ = 'technician_phones'
+
+    PhoneID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    PhoneNumber = db.Column(db.String(20), nullable=False, unique=True)
+    TechnicianID = db.Column(db.Integer, db.ForeignKey('servicetechnicians.TechnicianID'), nullable=False)
+    PhoneType = db.Column(db.Enum('Mobile', 'Work'), default='Mobile')
+
+    Technician = relationship('ServiceTechnician', back_populates='Phones')
+
+    def __repr__(self):
+        return f"<TechnicianPhone {self.PhoneNumber} ({self.PhoneType})>"
+from app import db
+from sqlalchemy.orm import relationship
+
+class TrackingCode(db.Model):
+    __tablename__ = 'trackingcodes'
+
+    TrackingID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Code = db.Column(db.String(50), unique=True, nullable=False)
+    CustomerID = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    ProductID = db.Column(db.Integer, db.ForeignKey('products.ProductID'), nullable=False)
+    RequestDate = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    Status = db.Column(db.String(50), default='Pending')
+
+    Customer = relationship('Customer', back_populates='TrackingCodes')
+    Product = relationship('Product', back_populates='TrackingCodes')
+    RepairRequests = relationship('RepairRequest', back_populates='TrackingCode', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<TrackingCode {self.TrackingID} - {self.Code}>"
+from app import db
+
+class WarrantyCondition(db.Model):
+    __tablename__ = 'warrantyconditions'
+
+    ConditionID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Title = db.Column(db.String(100), nullable=False)
+    Description = db.Column(db.Text)
+    IsActive = db.Column(db.Boolean, default=True)
+    CreatedAt = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+    UpdatedAt = db.Column(db.DateTime, server_default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+
+    def __repr__(self):
+        return f"<WarrantyCondition {self.ConditionID} - {self.Title}>"
+from .Customer import Customer
+from .CustomerPhone import CustomerPhone
+from .Conversation import Conversation
+from .Message import Message
+from .TrackingCode import TrackingCode
+from .Product import Product
+from .ServiceTechnician import ServiceTechnician
+from .TechnicianPhone import TechnicianPhone
+from .SalesRepresentative import SalesRepresentative
+from .SalesRepresentativePhone import SalesRepresentativePhone
+from .Invoice import Invoice
+from .PartsInventory import PartsInventory
+from .PartsRequest import PartsRequest
+from .PartsUsed import PartsUsed
+from .WarrantyCondition import WarrantyCondition
+from .NlpIntent import NlpIntent
+from .RepairRequest import RepairRequest
