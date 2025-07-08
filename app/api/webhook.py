@@ -9,6 +9,7 @@ from app.api.helpers import (
     get_or_create_flow
 )
 from app.models.nlp.Annotation import MessageAnnotation
+from app.nlp.intent_recognition import detect_intent
 
 from app.api.wppconnect_api import send_message_to_user
 from app.api.welcome import create_conversation
@@ -41,39 +42,38 @@ def webhook():
     phone = normalize_phone(raw_phone)
     print(f"📥 پیام از: {phone} - متن: {message}")
 
-    # فقط شماره‌های مجاز اجازه ادامه دارند
     if phone not in ALLOWED_NUMBERS:
         print(f"⚠️ شماره {phone} مجاز نیست.")
         return jsonify({"status": "number_not_allowed"}), 200
 
-    # 🔍 تحلیل NLP: intent و entity
-    predicted_intent = NLPIntent.query.filter_by(name='معرفی شخص').first()  # تستی - بعداً مدل جایگزین میشه
-    entities = extract_entities_from_text(message)  # از فایل entity_extractor
+    # تشخیص اینتنت واقعی
+    intent, score = detect_intent(message)  # این تابع رو import کن از app.nlp.intent_recognition
 
-    print(f"🤖 Intent: {predicted_intent.name if predicted_intent else 'نامشخص'}")
+    entities = extract_entities_from_text(message)
+    print(f"🤖 Intent: {intent if intent else 'نامشخص'}")
     print(f"📍 Entities: {entities}")
 
     annotation = MessageAnnotation(
         original_message=message,
-        intent_id=predicted_intent.id if predicted_intent else None,
+        intent_id=None,  # یا می‌تونی از جدول NLPIntent آی‌دی پیدا کنی اگر لازم داری
         entities=json.dumps(entities, ensure_ascii=False),
         annotated_by="system"
     )
     db.session.add(annotation)
     db.session.commit()
 
-    # بررسی نقش فرستنده
     sender_type, sender_id, sender_obj, has_open_conv = detect_sender_with_welcome_status(phone)
 
     if not has_open_conv:
         create_conversation(sender_type, sender_id)
+  # اصلاح شده فقط sender_id
         welcome_msg = build_response(sender_type, phone)
         send_message_to_user(session_id, phone, welcome_msg)
         return jsonify({"status": "welcome_sent"})
 
     if sender_type == "TempCustomer":
         append_message_to_temp_customer(phone, message, entities)
-        response_text = process_conversation_flow(phone, message)
+        response_text = process_conversation_flow(phone, message, entities)
         send_message_to_user(session_id, phone, response_text)
         return jsonify({"status": "flow_handled"})
 
