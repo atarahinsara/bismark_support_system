@@ -46,11 +46,10 @@ def detect_sender_with_welcome_status(phone: str):
 
 
 def build_response(sender_type: str, phone_number: str) -> str:
-    """
-    واکنش اولیه به کاربر بر اساس نوع فرستنده (مثلاً پیام خوش آمدگویی)
-    """
     template = MessageTemplate.query.filter_by(sender_type=sender_type).first()
-    text = template.message_template if template else "سلام 🙏 لطفاً نام و نام خانوادگی خود را وارد نمایید."
+    if not template:
+        print(f"⚠️ قالب پیام خوش‌آمد برای نوع {sender_type} یافت نشد.")
+    return template.message_template if template else "سلام 🙏 لطفاً نام و نام خانوادگی خود را وارد نمایید."
     return text
 
 
@@ -59,18 +58,23 @@ def get_or_create_flow(phone_number):
     واکشی جریان مکالمه (ConversationFlow) یا ایجاد یک جریان جدید از اولین مرحله
     """
     flow = ConversationFlow.query.filter_by(PhoneNumber=phone_number).first()
+    
     if not flow:
         first_step = NLPConversationStep.query.order_by(NLPConversationStep.Order.asc()).first()
+        
+        if not first_step:
+            raise Exception("❌ هیچ مرحله‌ای در جدول NLPConversationStep وجود ندارد.")
+        
         flow = ConversationFlow(
             PhoneNumber=phone_number,
-            Step=first_step.StepKey if first_step else "unknown",
+            Step=first_step.StepKey,
             TempData=json.dumps({}),
             LastUpdated=datetime.utcnow()
         )
         db.session.add(flow)
         db.session.commit()
-    return flow
 
+    return flow
 
 def get_value_from_entities(entities, field_name):
     """
@@ -104,8 +108,20 @@ def process_conversation_flow(phone_number, message_text, entities=[]):
         print("⚠️ مرحله فعلی پیدا نشد!")
         return "⛔️ مشکلی در جریان گفتگو پیش آمد."
 
-    # استخراج مقدار فیلد جاری از entities یا پیام کامل
-    value_for_field = get_value_from_entities(entities, current_step.FieldName) or message_text.strip()
+    # فقط اگر فیلد قبلاً ذخیره نشده بود، مقدار جدید ثبت شود
+    if current_step.FieldName in temp_data:
+        value_for_field = temp_data[current_step.FieldName]
+    else:
+        entity_value = get_value_from_entities(entities, current_step.FieldName)
+        if entity_value:
+            value_for_field = entity_value
+        else:
+            value_for_field = None
+
+    if value_for_field is None or value_for_field == "":
+        # مقدار فیلد خالیه؛ پیام برای اون مرحله دریافت نشده
+        # پس مجدداً همان پیام درخواست آن مرحله را می‌دهیم
+        return current_step.PromptMessage
 
     # به‌روزرسانی داده‌ها
     temp_data[current_step.FieldName] = value_for_field
@@ -173,20 +189,51 @@ def append_message_to_temp_customer(phone_number, new_message, entities):
         return
 
     flow = get_or_create_flow(phone_number)
-    current_step = flow.Step  # مثلاً 'first_name'
+    current_step_obj = NLPConversationStep.query.filter_by(StepKey=flow.Step).first()
+    if not current_step_obj:
+        print("⚠️ مرحله جاری در جدول NLPConversationStep یافت نشد.")
+        return
 
-    # مقدار صحیح فیلد را از entities استخراج کن
-    value_to_store = None
+    steps_order = [s.StepKey for s in NLPConversationStep.query.order_by(NLPConversationStep.Order.asc()).all()]
+    current_index = steps_order.index(flow.Step) if flow.Step in steps_order else -1
+    max_index = current_index
+
+    # نگاشت entity به فیلد مدل
+    entity_to_model_field = {
+        "first_name": "first_name",
+        "last_name": "last_name",
+        "province": "Province",
+        "city": "City",
+        "address": "Address"
+    }
+
+    updated_fields = []
+
     for entity in entities:
-        if entity['entity'] == current_step:
-            value_to_store = entity['value']
-            break
+        key = entity.get("entity")
+        val = entity.get("value")
+        model_field = entity_to_model_field.get(key)
+        if model_field and hasattr(temp, model_field):
+            setattr(temp, model_field, val)
+            updated_fields.append(model_field)
 
-    if not value_to_store:
-        # اگر entity مرتبط پیدا نشد، می‌توانی تصمیم بگیری یا مقدار کل پیام را ذخیره کنی یا نه
-        value_to_store = new_message.strip()
+            if model_field in steps_order:
+                step_idx = steps_order.index(model_field)
+                if step_idx > max_index:
+                    max_index = step_idx
 
-    print(f"🔄 آپدیت TempCustomer - شماره: {phone_number} - فیلد: {current_step} - مقدار جدید: {value_to_store}")
+    if not updated_fields:
+        print(f"⚠️ هیچ entity مرتبط با مرحله فعلی '{flow.Step}' یافت نشد. مقدار ذخیره نشد.")
+        db.session.commit()
+        return
+    else:
+        print(f"🔄 آپدیت TempCustomer - شماره: {phone_number} - فیلدها: {updated_fields}")
 
-    setattr(temp, current_step, value_to_store)
+    if updated_fields:
+        if max_index + 1 < len(steps_order):
+            flow.Step = steps_order[max_index + 1]
+            print(f"➡️ حرکت مرحله به: {flow.Step}")
+        else:
+            print("🏁 همه مراحل تکمیل شده")
+
     db.session.commit()
