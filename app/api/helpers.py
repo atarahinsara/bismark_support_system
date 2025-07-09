@@ -51,12 +51,24 @@ def detect_sender_with_welcome_status(phone: str):
         print(f"📂 مکالمه باز برای مشتری موقت وجود دارد: {bool(open_conv)}")
         return "TempCustomer", temp_customer.TempID, temp_customer, bool(open_conv)
 
-
+# ============================
+# بخش 3: ساخت پیام خوش‌آمد
+# ============================
 def build_response(sender_type: str, phone_number: str) -> str:
-    template = MessageTemplate.query.filter_by(sender_type=sender_type).first()
-    if not template:
-        print(f"⚠️ قالب پیام خوش‌آمد برای نوع {sender_type} یافت نشد.")
-    return template.message_template if template else "سلام 🙏 لطفاً نام و نام خانوادگی خود را وارد نمایید."
+    print(f"📝 ساخت پیام پاسخ برای نوع فرستنده '{sender_type}' و شماره '{phone_number}'")
+    person = None
+    try:
+        if sender_type == "Customer":
+            person = Customer.query.join(CustomerPhone).filter(CustomerPhone.PhoneNumber == phone_number).options(joinedload(Customer.Gender)).first()
+        elif sender_type == "SalesRepresentative":
+            person = SalesRepresentative.query.join(SalesRepresentativePhone).filter(SalesRepresentativePhone.PhoneNumber == phone_number).options(joinedload(SalesRepresentative.Gender)).first()
+        elif sender_type == "ServiceTechnician":
+            person = ServiceTechnician.query.join(TechnicianPhone).filter(TechnicianPhone.PhoneNumber == phone_number).options(joinedload(ServiceTechnician.Gender)).first()
+        elif sender_type == "TempCustomer":
+            person = CustomerTemp.query.filter_by(PhoneNumber=phone_number).first()
+    except Exception as e:
+        print(f"❌ خطا در واکشی اطلاعات شخص: {e}")
+        person = None
 
 
 def get_or_create_flow(phone_number):
