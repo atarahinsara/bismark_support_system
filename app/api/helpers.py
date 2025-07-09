@@ -51,9 +51,8 @@ def detect_sender_with_welcome_status(phone: str):
         print(f"📂 مکالمه باز برای مشتری موقت وجود دارد: {bool(open_conv)}")
         return "TempCustomer", temp_customer.TempID, temp_customer, bool(open_conv)
 
-# ============================
-# بخش 3: ساخت پیام خوش‌آمد
-# ============================
+from sqlalchemy.orm import joinedload
+
 def build_response(sender_type: str, phone_number: str) -> str:
     print(f"📝 ساخت پیام پاسخ برای نوع فرستنده '{sender_type}' و شماره '{phone_number}'")
     person = None
@@ -69,6 +68,7 @@ def build_response(sender_type: str, phone_number: str) -> str:
     except Exception as e:
         print(f"❌ خطا در واکشی اطلاعات شخص: {e}")
         person = None
+
 
 
 def get_or_create_flow(phone_number):
