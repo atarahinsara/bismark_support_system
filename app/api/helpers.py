@@ -1,5 +1,5 @@
 from app import db
-from app.models import Customer, CustomerPhone, CustomerTemp, MessageTemplate, Conversation, ConversationFlow
+from app.models import Customer, CustomerPhone,SalesRepresentative, SalesRepresentativePhone,ServiceTechnician, TechnicianPhone, CustomerTemp, MessageTemplate, Conversation, ConversationFlow
 from app.models.nlp.conversation_steps import NLPConversationStep
 from datetime import datetime
 import json
@@ -17,23 +17,39 @@ def normalize_phone(phone: str) -> str:
         phone = "0" + phone[2:]
     return phone
 
-
+# ============================
+# بخش 2: شناسایی نقش و وضعیت مکالمه
+# ============================
 def detect_sender_with_welcome_status(phone: str):
-    temp = CustomerTemp.query.filter_by(PhoneNumber=phone).first()
-    if temp:
-        open_conv = Conversation.query.filter_by(SenderID=temp.TempID, IsOpen=True).first()
-        return "TempCustomer", temp.TempID, temp, bool(open_conv)
+    print(f"🔍 شناسایی فرستنده برای شماره: {phone}")
 
-    new_temp = CustomerTemp(
-        first_name="",
-        last_name="",
-        PhoneNumber=phone,
-        Status="collecting",
-        CreatedAt=datetime.utcnow()
-    )
-    db.session.add(new_temp)
-    db.session.commit()
-    return "TempCustomer", new_temp.TempID, new_temp, False
+    customer = Customer.query.join(CustomerPhone).filter(CustomerPhone.PhoneNumber == phone).first()
+    if customer:
+        print(f"✅ فرستنده یک مشتری دائمی است: {customer.CustomerID}")
+        open_conv = Conversation.query.filter_by(SenderID=customer.CustomerID, IsOpen=True).first()
+        print(f"📂 مکالمه باز برای مشتری وجود دارد: {bool(open_conv)}")
+        return "Customer", customer.CustomerID, customer, bool(open_conv)
+
+    sales_rep = SalesRepresentative.query.join(SalesRepresentativePhone).filter(SalesRepresentativePhone.PhoneNumber == phone).first()
+    if sales_rep:
+        print(f"✅ فرستنده نماینده فروش است: {sales_rep.SalesRepID}")
+        open_conv = Conversation.query.filter_by(SenderID=sales_rep.SalesRepID, IsOpen=True).first()
+        print(f"📂 مکالمه باز برای نماینده فروش وجود دارد: {bool(open_conv)}")
+        return "SalesRepresentative", sales_rep.SalesRepID, sales_rep, bool(open_conv)
+
+    technician = ServiceTechnician.query.join(TechnicianPhone).filter(TechnicianPhone.PhoneNumber == phone).first()
+    if technician:
+        print(f"✅ فرستنده تکنسین خدمات است: {technician.TechnicianID}")
+        open_conv = Conversation.query.filter_by(SenderID=technician.TechnicianID, IsOpen=True).first()
+        print(f"📂 مکالمه باز برای تکنسین وجود دارد: {bool(open_conv)}")
+        return "ServiceTechnician", technician.TechnicianID, technician, bool(open_conv)
+
+    temp_customer = CustomerTemp.query.filter_by(PhoneNumber=phone).first()
+    if temp_customer:
+        print(f"✅ فرستنده مشتری موقت است: {temp_customer.TempID}")
+        open_conv = Conversation.query.filter_by(SenderID=temp_customer.TempID, IsOpen=True).first()
+        print(f"📂 مکالمه باز برای مشتری موقت وجود دارد: {bool(open_conv)}")
+        return "TempCustomer", temp_customer.TempID, temp_customer, bool(open_conv)
 
 
 def build_response(sender_type: str, phone_number: str) -> str:
